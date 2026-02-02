@@ -194,26 +194,48 @@ button.danger:hover{
 }
 
 .meta{
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  display: grid;
   gap: 10px;
   padding: 10px 10px 12px;
 }
 
-.meta .name{
-  color: var(--muted);
-  font-size: 13px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 60%;
+.info{
+  display: grid;
+  gap: 6px;
+  min-width: 0;
 }
 
-.actions{
+.info .name{
+  color: var(--muted);
+  font-size: 13px;
+  /* allow long filenames to wrap instead of cutting */
+  white-space: normal;
+  word-break: break-word;
+}
+
+.caption{
+  color: rgba(255,255,255,0.82);
+  font-size: 13px;
+  line-height: 1.3;
+
+  /* IMPORTANT: show full caption (no ellipsis) */
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  word-break: break-word;
+}
+
+.caption.empty{
+  color: rgba(255,255,255,0.45);
+  font-style: italic;
+}
+
+.actions-under{
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
 }
+
 
 /* drag-drop feedback */
 .dragover{
@@ -278,19 +300,3 @@ button.danger:hover{
   gap: 6px;
   min-width: 0;
 }
-
-.caption{
-  color: rgba(255,255,255,0.72);
-  font-size: 13px;
-  line-height: 1.2;
-  max-width: 520px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.caption.empty{
-  color: rgba(255,255,255,0.45);
-  font-style: italic;
-}
-
