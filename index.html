@@ -46,20 +46,25 @@
     </section>
 
     <section class="gallery" id="gallery" aria-label="Gallery"></section>
-
+    
     <template id="cardTpl">
       <figure class="card">
         <div class="thumb"></div>
         <figcaption class="meta">
-          <span class="name"></span>
+          <div class="left">
+            <span class="name"></span>
+            <div class="caption" title="Caption"></div>
+          </div>
+    
           <div class="actions">
             <button class="ghost small openBtn" type="button">Open</button>
+            <button class="ghost small capBtn" type="button">Caption</button>
             <button class="danger small delBtn" type="button">Delete</button>
           </div>
         </figcaption>
       </figure>
     </template>
-  </main>
+
 
   <footer class="foot">
     <small>© <span id="year"></span> I miss you</small>
