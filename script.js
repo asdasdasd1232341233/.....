@@ -5,11 +5,10 @@
 const SUPABASE_URL = "https://mvrfiptqfrsklhoqwctk.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_t57wbZarflBWQOsvJizRDg_MwHe7LgZ";
 
-// Your bucket name (must match what you created)
 const BUCKET = "memories";
-
-// Optional folder inside the bucket
 const FOLDER = "uploads";
+const CAPTIONS_TABLE = "captions";
+
 // ----------------------------
 // DOM
 // ----------------------------
@@ -28,14 +27,12 @@ const lightboxVideo = document.getElementById("lightboxVideo");
 const lightboxClose = document.getElementById("lightboxClose");
 
 // ----------------------------
-// Supabase client (IMPORTANT FIX)
+// Supabase client
 // ----------------------------
-// The CDN already creates window.supabase, so we must NOT redeclare `supabase`.
-// Use a different variable name:
 let supabaseClient = null;
 
-// Simple cache to avoid re-render flicker
-const CACHE_KEY = "imissyou_shared_cache_v1";
+// Cache
+const CACHE_KEY = "imissyou_shared_cache_v2";
 
 // ----------------------------
 // Helpers
@@ -68,7 +65,6 @@ function safeName(originalName) {
 }
 
 function publicUrlFor(path) {
-  // For public buckets:
   const { data } = supabaseClient.storage.from(BUCKET).getPublicUrl(path);
   return data.publicUrl;
 }
@@ -77,12 +73,10 @@ function publicUrlFor(path) {
 // Lightbox
 // ----------------------------
 function lightboxShowImage(src, alt) {
-  // Stop video if open
   lightboxVideo.pause();
   lightboxVideo.removeAttribute("src");
   lightboxVideo.load();
 
-  // Show image
   lightboxImg.src = src;
   lightboxImg.alt = alt || "Image";
 
@@ -94,11 +88,9 @@ function lightboxShowImage(src, alt) {
 }
 
 function lightboxShowVideo(src) {
-  // Clear image if open
   lightboxImg.removeAttribute("src");
   lightboxImg.classList.remove("show-img");
 
-  // Show video
   lightboxVideo.src = src;
   lightboxVideo.classList.add("show-video");
 
@@ -110,12 +102,10 @@ function closeLightbox() {
   lightbox.classList.remove("open");
   lightbox.setAttribute("aria-hidden", "true");
 
-  // stop video
   lightboxVideo.pause();
   lightboxVideo.removeAttribute("src");
   lightboxVideo.load();
 
-  // clear image
   lightboxImg.removeAttribute("src");
   lightboxImg.classList.remove("show-img");
   lightboxVideo.classList.remove("show-video");
@@ -153,7 +143,6 @@ async function init() {
     return;
   }
 
-  // Render cached items instantly (optional)
   const cached = loadCache();
   if (cached?.length) render(cached);
 
@@ -177,7 +166,6 @@ clearLocalBtn.addEventListener("click", () => {
   setStatus("Local cache cleared. Click Refresh.");
 });
 
-// Drag & drop
 window.addEventListener("dragover", (e) => {
   e.preventDefault();
   document.body.classList.add("dragover");
@@ -234,6 +222,39 @@ async function uploadFiles(files) {
 }
 
 // ----------------------------
+// Captions: load map {path -> caption}
+// ----------------------------
+async function fetchCaptions(paths) {
+  if (!paths.length) return new Map();
+
+  const { data, error } = await supabaseClient
+    .from(CAPTIONS_TABLE)
+    .select("path, caption")
+    .in("path", paths);
+
+  if (error) {
+    console.warn("Could not fetch captions:", error.message);
+    return new Map();
+  }
+
+  const map = new Map();
+  for (const row of data || []) {
+    map.set(row.path, row.caption || "");
+  }
+  return map;
+}
+
+async function upsertCaption(path, caption) {
+  const { error } = await supabaseClient
+    .from(CAPTIONS_TABLE)
+    .upsert({ path, caption }, { onConflict: "path" });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+// ----------------------------
 // List files
 // ----------------------------
 async function refreshGallery() {
@@ -260,9 +281,16 @@ async function refreshGallery() {
         name: x.name,
         path,
         url: publicUrlFor(path),
-        type: isVideoName(x.name) ? "video" : "image"
+        type: isVideoName(x.name) ? "video" : "image",
+        caption: ""
       };
     });
+
+  // Fetch captions for these items
+  const captionMap = await fetchCaptions(items.map(i => i.path));
+  for (const item of items) {
+    item.caption = captionMap.get(item.path) || "";
+  }
 
   saveCache(items);
   render(items);
@@ -274,19 +302,20 @@ async function refreshGallery() {
 // Delete file (shared)
 // ----------------------------
 async function deleteItem(path) {
-  if (!supabaseClient) return;
-
   const ok = confirm("Delete this for everyone?");
   if (!ok) return;
 
   setStatus("Deleting…");
-  const { error } = await supabaseClient.storage.from(BUCKET).remove([path]);
 
+  const { error } = await supabaseClient.storage.from(BUCKET).remove([path]);
   if (error) {
     console.error(error);
     setStatus(`Delete failed: ${error.message}`, true);
     return;
   }
+
+  // also delete caption row (optional)
+  await supabaseClient.from(CAPTIONS_TABLE).delete().eq("path", path);
 
   setStatus("Deleted. Refreshing…");
   await refreshGallery();
@@ -313,10 +342,22 @@ function render(items) {
     const node = tpl.content.cloneNode(true);
     const thumb = node.querySelector(".thumb");
     const nameEl = node.querySelector(".name");
+    const captionEl = node.querySelector(".caption");
     const openBtn = node.querySelector(".openBtn");
+    const capBtn = node.querySelector(".capBtn");
     const delBtn = node.querySelector(".delBtn");
 
     nameEl.textContent = item.name;
+
+    // caption display
+    if (item.caption && item.caption.trim().length) {
+      captionEl.textContent = item.caption;
+      captionEl.classList.remove("empty");
+    } else {
+      captionEl.textContent = "No caption";
+      captionEl.classList.add("empty");
+    }
+
     thumb.style.position = "relative";
 
     if (item.type === "video") {
@@ -348,6 +389,23 @@ function render(items) {
       thumb.addEventListener("click", () => lightboxShowImage(item.url, item.name));
       openBtn.addEventListener("click", () => lightboxShowImage(item.url, item.name));
     }
+
+    // caption edit
+    capBtn.addEventListener("click", async () => {
+      const current = item.caption || "";
+      const next = prompt("Caption:", current);
+      if (next === null) return; // cancelled
+
+      try {
+        setStatus("Saving caption…");
+        await upsertCaption(item.path, next.trim());
+        setStatus("Caption saved.");
+        await refreshGallery();
+      } catch (e) {
+        console.error(e);
+        setStatus(`Caption save failed: ${e.message}`, true);
+      }
+    });
 
     delBtn.addEventListener("click", () => deleteItem(item.path));
 
