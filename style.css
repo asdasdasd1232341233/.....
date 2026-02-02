@@ -300,3 +300,9 @@ button.danger:hover{
   gap: 6px;
   min-width: 0;
 }
+
+.name{
+  display: none;
+}
+
+
