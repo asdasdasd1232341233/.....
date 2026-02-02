@@ -272,3 +272,25 @@ button.danger:hover{
   border: 1px solid rgba(255,255,255,0.18);
   background: rgba(0,0,0,0.35);
 }
+
+.meta .left{
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.caption{
+  color: rgba(255,255,255,0.72);
+  font-size: 13px;
+  line-height: 1.2;
+  max-width: 520px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.caption.empty{
+  color: rgba(255,255,255,0.45);
+  font-style: italic;
+}
+
